@@ -27,7 +27,7 @@ model Settings {
 
 enum Role {
   CLIENT
-  MASTER
+  ADMIN
 }
 
 enum Type {

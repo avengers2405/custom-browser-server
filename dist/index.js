@@ -14,9 +14,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const dotenv_1 = __importDefault(require("dotenv"));
+const cors_1 = __importDefault(require("cors"));
 const client_1 = require("@prisma/client");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
+app.use(express_1.default.json());
+app.use((0, cors_1.default)());
 const prisma = new client_1.PrismaClient();
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
@@ -72,6 +75,35 @@ app.get('/settings/bw_filter', (req, res) => __awaiter(void 0, void 0, void 0, f
                 "whitelist": dbRes.data
             });
         }
+    }
+}));
+app.post('/login/:type', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    console.log('login request: ', req.params, req.body);
+    const { type } = req.params;
+    if (type == "client") {
+        const { id } = req.body;
+        console.log('recieved client: ', id);
+        res.status(200).send('reached client');
+    }
+    else if (type == "admin") {
+        const { id, pass } = req.body;
+        console.log('recieved admin: ', id, pass);
+        const prisma_res = yield prisma.entity.findUnique({
+            where: {
+                id: id
+            }
+        });
+        if (prisma_res && prisma_res.password == pass) {
+            console.log('login found');
+            res.status(200).send('login successful');
+        }
+        else {
+            console.log('login not found');
+            res.status(401).send('no admin found');
+        }
+    }
+    else {
+        res.status(400).send("Invalid user type");
     }
 }));
 app.listen(process.env.PORT, () => {
