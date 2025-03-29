@@ -49,6 +49,28 @@ async function main() {
     }
 }
 
+app.get('/settings/bw_filter', async (req, res) => {
+    const dbRes = await prisma.settings.findUnique({
+        where: {
+            id: "bw_filter_list"
+        }
+    });
+
+    if (dbRes){
+        // const jsonRes = JSON.parse(dbRes.data as string);
+        console.log('sending data: ', dbRes.data);
+        if (dbRes.type=="BLACKLIST"){
+            res.json({
+                "blacklist": dbRes.data
+            })
+        } else {
+            res.json({
+                "whitelist": dbRes.data
+            })
+        }
+    }
+})
+
 app.listen(process.env.PORT, () => {
     console.log(`Server running on ${process.env.PORT}...`);
 

@@ -53,6 +53,27 @@ function main() {
         }
     });
 }
+app.get('/settings/bw_filter', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const dbRes = yield prisma.settings.findUnique({
+        where: {
+            id: "bw_filter_list"
+        }
+    });
+    if (dbRes) {
+        // const jsonRes = JSON.parse(dbRes.data as string);
+        console.log('sending data: ', dbRes.data);
+        if (dbRes.type == "BLACKLIST") {
+            res.json({
+                "blacklist": dbRes.data
+            });
+        }
+        else {
+            res.json({
+                "whitelist": dbRes.data
+            });
+        }
+    }
+}));
 app.listen(process.env.PORT, () => {
     console.log(`Server running on ${process.env.PORT}...`);
     main()
