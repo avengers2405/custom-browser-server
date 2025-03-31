@@ -74,7 +74,7 @@ ws.on('connection', (ws) => {
                         ws.send("8unable to create entity");
                     }
                     else {
-                        const res = yield prisma.logs.create({
+                        yield prisma.logs.create({
                             data: {
                                 entityId: ws.id,
                                 actionType: "CLIENT_LOGIN",
@@ -95,8 +95,18 @@ ws.on('connection', (ws) => {
                     ws.send('3'); // send pong
                 }
                 else if (msg[0] == '4') {
-                    // message recieved
-                    ws.send(`recieved message: ${msg}`);
+                    const data = JSON.parse(msg.substring(1));
+                    if (data.action == 'log') {
+                        yield prisma.logs.create({
+                            data: {
+                                entityId: ws.id,
+                                actionType: data.actionType,
+                                description: data.description,
+                                blocked: data.blocked,
+                            }
+                        });
+                    }
+                    // ws.send(`recieved message: ${msg}`)
                 }
                 else if (msg[0] > '7') {
                     ws.send('please send message with proper code (0-7) prefixed');

@@ -32,6 +32,7 @@ model Logs {
   entityId String
   actionType ActionType
   description String?
+  blocked Boolean?
   timestamp DateTime @default(now())
   entity Entity @relation(fields: [entityId], references: [id])
 }

@@ -61,7 +61,7 @@ ws.on('connection', (ws: WebSocket)=>{
                     if (!res) {
                         ws.send("8unable to create entity");
                     } else {
-                        const res = await prisma.logs.create({
+                        await prisma.logs.create({
                             data: {
                                 entityId: (ws as any).id,
                                 actionType: "CLIENT_LOGIN",
@@ -79,8 +79,18 @@ ws.on('connection', (ws: WebSocket)=>{
                 if (msg[0]=='2'){
                     ws.send('3'); // send pong
                 } else if (msg[0]=='4'){
-                    // message recieved
-                    ws.send(`recieved message: ${msg}`)
+                    const data = JSON.parse(msg.substring(1));
+                    if (data.action=='log'){
+                        await prisma.logs.create({
+                            data:{
+                                entityId: (ws as any).id,
+                                actionType: data.actionType,
+                                description: data.description,
+                                blocked : data.blocked,
+                            }
+                        })
+                    }
+                    // ws.send(`recieved message: ${msg}`)
                 } else if (msg[0]>'7') {
                     ws.send('please send message with proper code (0-7) prefixed')
                 }
