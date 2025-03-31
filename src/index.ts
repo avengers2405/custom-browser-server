@@ -16,28 +16,75 @@ const ws = new WebSocket.Server({server: httpServer});
 
 ws.on('connection', (ws: WebSocket)=>{
     console.log('new client connected.');
-    // optionally send a confguration message to client starting with '0'
-    // i am planning sid to be a a fixed initial value till client is not logged in, then change it to client id / admin id once client / admin logs in 
-    const config_data = `0${JSON.stringify({
-        "sid": "not-logged-in",
-    })}`
-    // pingInterval, pingTimeout is unnecessary
-    ws.send(config_data);
-
     // no need to maintain ping for connection between server and client as we get disconnected if web socket disconnects
 
-    ws.on('message', (message)=>{
+    ws.on('message', async (message)=>{
         var msg = message.toString()
         console.log('message recieved: ', msg);
-        if (msg[0]=='2'){
-            ws.send('3'); // send pong
-        } else if (msg[1]=='3'){
-            // ignore as it is a pong
-        } else if (msg[1]=='4'){
-            // message recieved
-            ws.send(`recieved message: ${msg}`)
+        if (msg[0]=='0'){
+            // contains MAC address
+            var cid =(Math.random() + 1).toString(36).substring(2)+(Math.random() + 1).toString(36).substring(2)+(Math.random() + 1).toString(36).substring(2)+(Math.random() + 1).toString(36).substring(2);
+            var check_unique_id = await prisma.mac.findUnique({
+                where: {
+                    entityId: cid,
+                }
+            });
+            while (check_unique_id){
+                cid =(Math.random() + 1).toString(36).substring(2)+(Math.random() + 1).toString(36).substring(2)+(Math.random() + 1).toString(36).substring(2)+(Math.random() + 1).toString(36).substring(2);
+                check_unique_id = await prisma.mac.findUnique({
+                    where: {
+                        entityId: cid,
+                    }
+                });
+            }
+            // unique cid found (client id)
+            (ws as any).id = cid;
+            const data = JSON.parse(msg.substring(1));
+            if (!data.mac){
+                ws.send('5');
+            } else {
+                const res = await prisma.mac.create({
+                    data: {
+                        entityId: (ws as any).id,
+                        mac: data.mac,
+                    }
+                });
+                if (!res) {
+                    ws.send("8unable to register client id and MAC address")
+                } else {
+                    const res = await prisma.entity.create({
+                        data: {
+                            id: (ws as any).id,
+                            role: "CLIENT",
+                        }
+                    });
+                    if (!res) {
+                        ws.send("8unable to create entity");
+                    } else {
+                        const res = await prisma.logs.create({
+                            data: {
+                                entityId: (ws as any).id,
+                                actionType: "CLIENT_LOGIN",
+                            }
+                        });
+                        ws.send('6');
+                    }
+                }
+            }
+            console.log('client id: ', (ws as any).id);
         } else {
-            ws.send('please send message with proper code (0-5) prefixed')
+            if (!(ws as any).id) {
+                ws.send('5send config details first');
+            } else {
+                if (msg[0]=='2'){
+                    ws.send('3'); // send pong
+                } else if (msg[0]=='4'){
+                    // message recieved
+                    ws.send(`recieved message: ${msg}`)
+                } else if (msg[0]>'7') {
+                    ws.send('please send message with proper code (0-7) prefixed')
+                }
+            }
         }
     });
 

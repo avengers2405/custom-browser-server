@@ -27,36 +27,83 @@ const httpServer = (0, http_1.createServer)(app);
 const ws = new ws_1.default.Server({ server: httpServer });
 ws.on('connection', (ws) => {
     console.log('new client connected.');
-    // optionally send a confguration message to client starting with '0'
-    // i am planning sid to be a a fixed initial value till client is not logged in, then change it to client id / admin id once client / admin logs in 
-    const config_data = `0${JSON.stringify({
-        "sid": "not-logged-in",
-    })}`;
-    // pingInterval, pingTimeout is unnecessary
-    var sent_config = false;
-    ws.send(config_data);
     // no need to maintain ping for connection between server and client as we get disconnected if web socket disconnects
-    ws.on('message', (message) => {
-        // if (!sent_config){
-        //     ws.send(config_data);
-        //     sent_config=true;
-        // }
+    ws.on('message', (message) => __awaiter(void 0, void 0, void 0, function* () {
         var msg = message.toString();
         console.log('message recieved: ', msg);
-        if (msg[0] == '2') {
-            ws.send('3'); // send pong
-        }
-        else if (msg[1] == '3') {
-            // ignore as it is a pong
-        }
-        else if (msg[1] == '4') {
-            // message recieved
-            ws.send(`recieved message: ${msg}`);
+        if (msg[0] == '0') {
+            // contains MAC address
+            var cid = (Math.random() + 1).toString(36).substring(2) + (Math.random() + 1).toString(36).substring(2) + (Math.random() + 1).toString(36).substring(2) + (Math.random() + 1).toString(36).substring(2);
+            var check_unique_id = yield prisma.mac.findUnique({
+                where: {
+                    entityId: cid,
+                }
+            });
+            while (check_unique_id) {
+                cid = (Math.random() + 1).toString(36).substring(2) + (Math.random() + 1).toString(36).substring(2) + (Math.random() + 1).toString(36).substring(2) + (Math.random() + 1).toString(36).substring(2);
+                check_unique_id = yield prisma.mac.findUnique({
+                    where: {
+                        entityId: cid,
+                    }
+                });
+            }
+            // unique cid found (client id)
+            ws.id = cid;
+            const data = JSON.parse(msg.substring(1));
+            if (!data.mac) {
+                ws.send('5');
+            }
+            else {
+                const res = yield prisma.mac.create({
+                    data: {
+                        entityId: ws.id,
+                        mac: data.mac,
+                    }
+                });
+                if (!res) {
+                    ws.send("8unable to register client id and MAC address");
+                }
+                else {
+                    const res = yield prisma.entity.create({
+                        data: {
+                            id: ws.id,
+                            role: "CLIENT",
+                        }
+                    });
+                    if (!res) {
+                        ws.send("8unable to create entity");
+                    }
+                    else {
+                        const res = yield prisma.logs.create({
+                            data: {
+                                entityId: ws.id,
+                                actionType: "CLIENT_LOGIN",
+                            }
+                        });
+                        ws.send('6');
+                    }
+                }
+            }
+            console.log('client id: ', ws.id);
         }
         else {
-            ws.send('please send message with proper code (0-5) prefixed');
+            if (!ws.id) {
+                ws.send('5send config details first');
+            }
+            else {
+                if (msg[0] == '2') {
+                    ws.send('3'); // send pong
+                }
+                else if (msg[0] == '4') {
+                    // message recieved
+                    ws.send(`recieved message: ${msg}`);
+                }
+                else if (msg[0] > '7') {
+                    ws.send('please send message with proper code (0-7) prefixed');
+                }
+            }
         }
-    });
+    }));
     ws.on('close', () => {
         console.log('client disconnected');
     });
