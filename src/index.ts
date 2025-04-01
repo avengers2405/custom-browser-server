@@ -219,6 +219,24 @@ app.post('/login/:type', async (req, res) => {
     }
 })
 
+
+
+app.get('/clientdata', async (req, res) => {
+    try {
+        const clientData = await prisma.logs.findMany();  
+        const settings = await prisma.settings.findMany(); 
+
+        // console.log("Settings",settings);
+        console.log("Clientdata",clientData);
+
+        res.json({ clientData, settings });
+    } catch (error) {
+        console.error("Error fetching data:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
+
 httpServer.listen(process.env.PORT, () => {
     console.log(`Server running on ${process.env.PORT}...`);
 

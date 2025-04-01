@@ -227,6 +227,19 @@ app.post('/login/:type', (req, res) => __awaiter(void 0, void 0, void 0, functio
         res.status(400).send("Invalid user type");
     }
 }));
+app.get('/clientdata', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const clientData = yield prisma.logs.findMany();
+        const settings = yield prisma.settings.findMany();
+        // console.log("Settings",settings);
+        console.log("Clientdata", clientData);
+        res.json({ clientData, settings });
+    }
+    catch (error) {
+        console.error("Error fetching data:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+}));
 httpServer.listen(process.env.PORT, () => {
     console.log(`Server running on ${process.env.PORT}...`);
     main()
