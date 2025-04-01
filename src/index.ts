@@ -13,6 +13,7 @@ app.use(cors())
 const prisma = new PrismaClient();
 const httpServer = createServer(app);
 const ws = new WebSocket.Server({server: httpServer});
+const adminUpdates = new Set<string>(); // stores client_ids who have been upgraded to ADMIN role.
 
 ws.on('connection', (ws: WebSocket)=>{
     console.log('new client connected.');
