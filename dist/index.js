@@ -25,6 +25,7 @@ app.use((0, cors_1.default)());
 const prisma = new client_1.PrismaClient();
 const httpServer = (0, http_1.createServer)(app);
 const ws = new ws_1.default.Server({ server: httpServer });
+const adminUpdates = new Set(); // stores client_ids who have been upgraded to ADMIN role.
 ws.on('connection', (ws) => {
     console.log('new client connected.');
     // no need to maintain ping for connection between server and client as we get disconnected if web socket disconnects
@@ -80,7 +81,7 @@ ws.on('connection', (ws) => {
                                 actionType: "CLIENT_LOGIN",
                             }
                         });
-                        ws.send('6');
+                        ws.send(`6${JSON.stringify({ "client_id": ws.id })}`);
                     }
                 }
             }

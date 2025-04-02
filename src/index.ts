@@ -68,7 +68,7 @@ ws.on('connection', (ws: WebSocket)=>{
                                 actionType: "CLIENT_LOGIN",
                             }
                         });
-                        ws.send('6');
+                        ws.send(`6${JSON.stringify({"client_id": (ws as any).id})}`);
                     }
                 }
             }
