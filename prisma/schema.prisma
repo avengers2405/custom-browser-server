@@ -23,7 +23,7 @@ model Entity {
 
 model Settings {
   id String @id @default(cuid()) @map("_id")
-  type Type @default(BLACKLIST)
+  type Type @default(BLACKLIST) @unique
   data Json
 }
 

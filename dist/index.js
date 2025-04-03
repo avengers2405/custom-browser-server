@@ -81,7 +81,7 @@ ws.on('connection', (ws) => {
                                 actionType: "CLIENT_LOGIN",
                             }
                         });
-                        ws.send(`6${JSON.stringify({ "client_id": ws.id })}`);
+                        ws.send(`6`);
                     }
                 }
             }
@@ -106,6 +106,60 @@ ws.on('connection', (ws) => {
                                 blocked: data.blocked,
                             }
                         });
+                    }
+                    if (data.action == "admin") {
+                        ws.admin = true;
+                        console.log("made ws with client id: ", ws.id, " as admin.");
+                    }
+                    console.log('RECIEVED MSG: ', data);
+                    // process queries here for data updates / requests
+                    if (data.type == 'whitelist') {
+                        if (ws.admin == true || adminUpdates.has(ws.id)) {
+                            adminUpdates.delete(ws.id);
+                            console.log('processing queries: ', "whitelist");
+                            const res = yield prisma.settings.findUnique({
+                                where: {
+                                    type: "WHITELIST"
+                                }
+                            });
+                            ws.send('4' + JSON.stringify({
+                                "type": "response",
+                                "for": "whitelist",
+                                "data": res
+                            }));
+                        }
+                    }
+                    else if (data.type == 'blacklist') {
+                        if (ws.admin == true || adminUpdates.has(ws.id)) {
+                            adminUpdates.delete(ws.id);
+                            console.log('processing queries: ', "blacklist");
+                            const res = yield prisma.settings.findUnique({
+                                where: {
+                                    type: "BLACKLIST"
+                                }
+                            });
+                            ws.send('4' + JSON.stringify({
+                                "type": "response",
+                                "for": "blacklist",
+                                "data": res
+                            }));
+                        }
+                    }
+                    else if (data.type == 'log') {
+                        if (ws.admin == true || adminUpdates.has(ws.id)) {
+                            adminUpdates.delete(ws.id);
+                            console.log('processing queries: ', "logs");
+                            const res = yield prisma.logs.findMany({
+                                skip: data.offset,
+                                take: data.limit
+                            });
+                            console.log('logs ke liye response: ', res);
+                            ws.send('4' + JSON.stringify({
+                                "type": "response",
+                                "for": "range_log",
+                                "data": res
+                            }));
+                        }
                     }
                     // ws.send(`recieved message: ${msg}`)
                 }

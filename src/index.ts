@@ -68,7 +68,7 @@ ws.on('connection', (ws: WebSocket)=>{
                                 actionType: "CLIENT_LOGIN",
                             }
                         });
-                        ws.send(`6${JSON.stringify({"client_id": (ws as any).id})}`);
+                        ws.send(`6`);
                     }
                 }
             }
@@ -91,6 +91,64 @@ ws.on('connection', (ws: WebSocket)=>{
                             }
                         })
                     }
+
+                    if (data.action=="admin"){
+                        (ws as any).admin = true;
+                        console.log("made ws with client id: ", (ws as any).id, " as admin.");
+                    }
+
+                    console.log('RECIEVED MSG: ', data);
+                    // process queries here for data updates / requests
+                    if (data.type == 'whitelist'){
+                        if ((ws as any).admin == true || adminUpdates.has((ws as any).id)){
+                            adminUpdates.delete((ws as any).id);
+                            console.log('processing queries: ', "whitelist");
+                            const res = await prisma.settings.findUnique({
+                                where: {
+                                    type: "WHITELIST"
+                                }
+                            })
+                            ws.send('4'+JSON.stringify({
+                                "type": "response",
+                                "for": "whitelist",
+                                "data": res
+                            }));
+                        }
+                    } else if (data.type == 'blacklist'){
+                        if ((ws as any).admin == true || adminUpdates.has((ws as any).id)){
+                            adminUpdates.delete((ws as any).id);
+                            console.log('processing queries: ', "blacklist");
+                            const res = await prisma.settings.findUnique({
+                                where: {
+                                    type: "BLACKLIST"
+                                }
+                            })
+                            ws.send('4'+JSON.stringify({
+                                "type": "response",
+                                "for": "blacklist",
+                                "data": res
+                            }));
+                        }
+                    } else if (data.type == 'log'){
+                        if ((ws as any).admin == true || adminUpdates.has((ws as any).id)){
+                            adminUpdates.delete((ws as any).id);
+                            console.log('processing queries: ', "logs");
+                            const res = await prisma.logs.findMany({
+                                skip: data.offset,
+                                take: data.limit,
+                                orderBy: {
+                                    timestamp: 'asc' 
+                                }
+                            });
+                            console.log('logs ke liye response: ', res);
+                            ws.send('4'+JSON.stringify({
+                                "type": "response",
+                                "for": "range_log",
+                                "data": res
+                            }));
+                        }
+                    }
+
                     // ws.send(`recieved message: ${msg}`)
                 } else if (msg[0]>'7') {
                     ws.send('please send message with proper code (0-7) prefixed')
