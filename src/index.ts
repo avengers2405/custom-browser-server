@@ -137,7 +137,7 @@ ws.on('connection', (ws: WebSocket)=>{
                                 skip: data.offset,
                                 take: data.limit,
                                 orderBy: {
-                                    timestamp: 'asc' 
+                                    timestamp: 'desc' 
                                 }
                             });
                             console.log('logs ke liye response: ', res);

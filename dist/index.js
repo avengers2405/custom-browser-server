@@ -151,7 +151,10 @@ ws.on('connection', (ws) => {
                             console.log('processing queries: ', "logs");
                             const res = yield prisma.logs.findMany({
                                 skip: data.offset,
-                                take: data.limit
+                                take: data.limit,
+                                orderBy: {
+                                    timestamp: 'desc'
+                                }
                             });
                             console.log('logs ke liye response: ', res);
                             ws.send('4' + JSON.stringify({
