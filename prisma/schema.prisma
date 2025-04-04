@@ -16,6 +16,7 @@ datasource db {
 model Entity {
   id String @id @default(cuid()) @map("_id") // this is client or admin id
   password String @default("pict123")
+  createdAt DateTime? @default(now())
   role Role
   logs Logs[]
   mac Mac @relation(fields: [id], references: [entityId])

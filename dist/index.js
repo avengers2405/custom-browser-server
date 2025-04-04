@@ -18,6 +18,7 @@ const cors_1 = __importDefault(require("cors"));
 const client_1 = require("@prisma/client");
 const http_1 = require("http");
 const ws_1 = __importDefault(require("ws"));
+const redis_1 = require("redis");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 app.use(express_1.default.json());
@@ -25,7 +26,13 @@ app.use((0, cors_1.default)());
 const prisma = new client_1.PrismaClient();
 const httpServer = (0, http_1.createServer)(app);
 const ws = new ws_1.default.Server({ server: httpServer });
-const adminUpdates = new Set(); // stores client_ids who have been upgraded to ADMIN role.
+const admin = new Set(); // stores client_ids who have been upgraded to ADMIN role.
+const redisPublisher = (0, redis_1.createClient)({
+    url: process.env.REDIS_URL
+});
+const redisSubscriber = (0, redis_1.createClient)({
+    url: process.env.REDIS_URL
+});
 ws.on('connection', (ws) => {
     console.log('new client connected.');
     // no need to maintain ping for connection between server and client as we get disconnected if web socket disconnects
@@ -55,35 +62,38 @@ ws.on('connection', (ws) => {
                 ws.send('5');
             }
             else {
-                const res = yield prisma.mac.create({
+                console.log('at mac, creating with id: ', ws.id, cid);
+                prisma.mac.create({
                     data: {
                         entityId: ws.id,
                         mac: data.mac,
                     }
-                });
-                if (!res) {
-                    ws.send("8unable to register client id and MAC address");
-                }
-                else {
-                    const res = yield prisma.entity.create({
+                }).then((res) => {
+                    prisma.entity.create({
                         data: {
-                            id: ws.id,
+                            id: res.entityId,
                             role: "CLIENT",
                         }
-                    });
-                    if (!res) {
-                        ws.send("8unable to create entity");
-                    }
-                    else {
-                        yield prisma.logs.create({
+                    }).then((res) => {
+                        prisma.logs.create({
                             data: {
-                                entityId: ws.id,
+                                entityId: res.id,
                                 actionType: "CLIENT_LOGIN",
                             }
+                        }).then((res) => {
+                            ws.send(`6`);
+                        }).catch((e) => {
+                            console.log('error creating logs: ', e);
+                            ws.send("8unable to create logs");
                         });
-                        ws.send(`6`);
-                    }
-                }
+                    }).catch((e) => {
+                        console.log('error creating entity: ', e);
+                        ws.send("8unable to create entity");
+                    });
+                }).catch((e) => {
+                    console.log('error creating mac: ', e);
+                    ws.send("8unable to create mac address");
+                });
             }
             console.log('client id: ', ws.id);
         }
@@ -98,7 +108,7 @@ ws.on('connection', (ws) => {
                 else if (msg[0] == '4') {
                     const data = JSON.parse(msg.substring(1));
                     if (data.action == 'log') {
-                        yield prisma.logs.create({
+                        const res = yield prisma.logs.create({
                             data: {
                                 entityId: ws.id,
                                 actionType: data.actionType,
@@ -106,16 +116,21 @@ ws.on('connection', (ws) => {
                                 blocked: data.blocked,
                             }
                         });
+                        console.log('creating log');
+                        redisPublisher.publish('update-log', JSON.stringify({
+                            res
+                        }));
+                        console.log('published log');
                     }
                     if (data.action == "admin") {
                         ws.admin = true;
+                        admin.add(ws);
                         console.log("made ws with client id: ", ws.id, " as admin.");
                     }
                     console.log('RECIEVED MSG: ', data);
                     // process queries here for data updates / requests
                     if (data.type == 'whitelist') {
-                        if (ws.admin == true || adminUpdates.has(ws.id)) {
-                            adminUpdates.delete(ws.id);
+                        if (ws.admin == true) {
                             console.log('processing queries: ', "whitelist");
                             const res = yield prisma.settings.findUnique({
                                 where: {
@@ -130,8 +145,7 @@ ws.on('connection', (ws) => {
                         }
                     }
                     else if (data.type == 'blacklist') {
-                        if (ws.admin == true || adminUpdates.has(ws.id)) {
-                            adminUpdates.delete(ws.id);
+                        if (ws.admin == true) {
                             console.log('processing queries: ', "blacklist");
                             const res = yield prisma.settings.findUnique({
                                 where: {
@@ -146,8 +160,7 @@ ws.on('connection', (ws) => {
                         }
                     }
                     else if (data.type == 'log') {
-                        if (ws.admin == true || adminUpdates.has(ws.id)) {
-                            adminUpdates.delete(ws.id);
+                        if (ws.admin == true) {
                             console.log('processing queries: ', "logs");
                             const res = yield prisma.logs.findMany({
                                 skip: data.offset,
@@ -173,6 +186,7 @@ ws.on('connection', (ws) => {
         }
     }));
     ws.on('close', () => {
+        admin.delete(ws);
         console.log('client disconnected');
     });
     ws.on('error', (error) => {
@@ -181,6 +195,35 @@ ws.on('connection', (ws) => {
 });
 ws.on('error', (error) => {
     console.log('error inside connection: ', error);
+});
+function setupdRedis() {
+    return __awaiter(this, void 0, void 0, function* () {
+        yield redisPublisher.connect();
+        yield redisSubscriber.connect();
+        redisSubscriber.subscribe('update-log', (message) => {
+            console.log('message recived: ', message);
+            try {
+                admin.forEach((ws) => {
+                    console.log('at admin: ', ws.id);
+                    if (ws.readyState == ws_1.default.OPEN) {
+                        ws.send('4' + JSON.stringify({
+                            "type": "update",
+                            "for": "log",
+                            "data": message
+                        }));
+                    }
+                });
+            }
+            catch (error) {
+                console.log('error in subscribing: ', error);
+            }
+        });
+    });
+}
+setupdRedis().then(val => {
+    console.log('connection to redis done');
+}).catch(e => {
+    console.log('error in redis connection: ', e);
 });
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
@@ -252,18 +295,7 @@ app.post('/login/:type', (req, res) => __awaiter(void 0, void 0, void 0, functio
             res.status(200).send('client found');
         }
         else {
-            const prisma_req = yield prisma.entity.create({
-                data: {
-                    id: id,
-                    role: "CLIENT"
-                }
-            });
-            if (prisma_req) {
-                res.status(200).send('client created');
-            }
-            else {
-                res.status(500).send('client not found, and failed to create');
-            }
+            console.log("CHECK WHY CLIENT NOT FOUND");
         }
     }
     else if (type == "admin") {
@@ -283,19 +315,6 @@ app.post('/login/:type', (req, res) => __awaiter(void 0, void 0, void 0, functio
     }
     else {
         res.status(400).send("Invalid user type");
-    }
-}));
-app.get('/clientdata', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const clientData = yield prisma.logs.findMany();
-        const settings = yield prisma.settings.findMany();
-        // console.log("Settings",settings);
-        console.log("Clientdata", clientData);
-        res.json({ clientData, settings });
-    }
-    catch (error) {
-        console.error("Error fetching data:", error);
-        res.status(500).json({ error: "Internal Server Error" });
     }
 }));
 httpServer.listen(process.env.PORT, () => {
