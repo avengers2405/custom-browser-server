@@ -145,6 +145,7 @@ ws.on('connection', (ws) => {
                         }
                     }
                     else if (data.type == 'blacklist') {
+                        console.log("--------------");
                         if (ws.admin == true) {
                             console.log('processing queries: ', "blacklist");
                             const res = yield prisma.settings.findUnique({
@@ -175,6 +176,56 @@ ws.on('connection', (ws) => {
                                 "for": "range_log",
                                 "data": res
                             }));
+                        }
+                    }
+                    else if (data.type == 'update_settings') {
+                        console.log("Processing request: update_settings");
+                        const settingsObject = data.settings; // Type assertion
+                        if (!settingsObject || !settingsObject.id) {
+                            console.error("Received invalid settings object for update:", settingsObject);
+                            ws.send('8Invalid settings data received for update.');
+                            return;
+                        }
+                        // Ensure the data structure matches FilterListData
+                        const settingsData = settingsObject.data;
+                        if (!settingsData || !Array.isArray(settingsData.domains) || !Array.isArray(settingsData.keywords) || !settingsData.lastUpdated) {
+                            console.error("Received invalid data structure within settings object:", settingsData);
+                            ws.send('8Invalid data structure in settings update.');
+                            return;
+                        }
+                        try {
+                            console.log(`Updating settings for ID: ${settingsObject.id}`);
+                            // Make sure lastUpdated is current
+                            settingsData.lastUpdated = new Date().toISOString();
+                            const updatedSettings = yield prisma.settings.update({
+                                where: {
+                                    id: settingsObject.id // Use the ID from the incoming object
+                                },
+                                data: {
+                                    type: settingsObject.type, // Update type (e.g., BLACKLIST)
+                                    data: settingsData, // Update the data payload (domains, keywords, lastUpdated)
+                                }
+                            });
+                            console.log("Settings updated successfully:", updatedSettings);
+                            // Send confirmation back (optional)
+                            ws.send('4' + JSON.stringify({
+                                type: "response",
+                                for: "update_settings",
+                                success: true,
+                                updatedData: updatedSettings // Send back the updated data
+                            }));
+                            // OPTIONAL: Broadcast update to other admins?
+                            // Requires adding another Redis channel or iterating over 'admin' set
+                            // Example (simple broadcast without Redis):
+                            // admin.forEach(adminWs => {
+                            //     if (adminWs !== ws && adminWs.readyState === WebSocket.OPEN) {
+                            //         adminWs.send('4' + JSON.stringify({ type: "settings_updated", listType: updatedSettings.type, data: updatedSettings.data }));
+                            //     }
+                            // });
+                        }
+                        catch (e) {
+                            console.error(`Error updating settings (ID: ${settingsObject.id}):`, e);
+                            ws.send(`8Error updating settings: ${e.message}`);
                         }
                     }
                     // ws.send(`recieved message: ${msg}`)
