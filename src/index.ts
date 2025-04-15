@@ -126,7 +126,7 @@ ws.on('connection', (ws: WebSocket) => {
                                 }
                             })
                             ws.send('4' + JSON.stringify({
-                                "type": "response",
+                                "type": "all_data",
                                 "for": "whitelist",
                                 "data": res
                             }));
@@ -141,7 +141,7 @@ ws.on('connection', (ws: WebSocket) => {
                                 }
                             })
                             ws.send('4' + JSON.stringify({
-                                "type": "response",
+                                "type": "all_data",
                                 "for": "blacklist",
                                 "data": res
                             }));
@@ -159,7 +159,7 @@ ws.on('connection', (ws: WebSocket) => {
                             });
                             console.log('logs ke liye response: ', res);
                             ws.send('4' + JSON.stringify({
-                                "type": "response",
+                                "type": "all_data",
                                 "for": "range_log",
                                 "data": res
                             }));
@@ -200,8 +200,8 @@ ws.on('connection', (ws: WebSocket) => {
                             console.log("Settings updated successfully:", updatedSettings);
                             // Send confirmation back (optional)
                             ws.send('4' + JSON.stringify({
-                                type: "response",
-                                for: "update_settings",
+                                type: "update",
+                                for: "settings",
                                 success: true,
                                 updatedData: updatedSettings // Send back the updated data
                             }));
