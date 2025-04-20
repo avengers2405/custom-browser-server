@@ -166,7 +166,7 @@ ws.on('connection', (ws: WebSocket) => {
                         }
                     } else if (data.type == 'update_settings') {
                         console.log("Processing request: update_settings");
-                        const settingsObject = data.settings  // Type assertion
+                        const settingsObject = data.settings 
 
                         if (!settingsObject || !settingsObject.id) {
                             console.error("Received invalid settings object for update:", settingsObject);
@@ -175,17 +175,10 @@ ws.on('connection', (ws: WebSocket) => {
                         }
 
                         // Ensure the data structure matches FilterListData
-                        const settingsData = settingsObject.data as any as FilterListData;
-                        if (!settingsData || !Array.isArray(settingsData.domains) || !Array.isArray(settingsData.keywords) || !settingsData.lastUpdated) {
-                            console.error("Received invalid data structure within settings object:", settingsData);
-                            ws.send('8Invalid data structure in settings update.');
-                            return;
-                        }
-
+                        const settingsData = settingsObject.data as any
 
                         try {
                             console.log(`Updating settings for ID: ${settingsObject.id}`);
-                            // Make sure lastUpdated is current
                             settingsData.lastUpdated = new Date().toISOString();
 
                             const updatedSettings = await prisma.settings.update({
@@ -198,11 +191,9 @@ ws.on('connection', (ws: WebSocket) => {
                                 }
                             });
                             console.log("Settings updated successfully:", updatedSettings);
-                            // Send confirmation back (optional)
                             ws.send('4' + JSON.stringify({
                                 type: "update",
                                 for: "settings",
-                                success: true,
                                 updatedData: updatedSettings // Send back the updated data
                             }));
 
@@ -241,12 +232,6 @@ ws.on('connection', (ws: WebSocket) => {
 ws.on('error', (error) => {
     console.log('error inside connection: ', error)
 })
-
-interface FilterListData {
-    domains: string[];
-    keywords: string[];
-    lastUpdated: string;
-}
 
 async function setupdRedis() {
     await redisPublisher.connect();
@@ -287,7 +272,7 @@ async function main() {
     if (!res) {
         console.log('settings not found, filling default details');
 
-        const settingsData: FilterListData = {
+        const settingsData = {
             domains: [
                 'x.com/',
                 'facebook.com/',
